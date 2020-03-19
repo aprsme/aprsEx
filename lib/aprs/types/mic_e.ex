@@ -1,4 +1,7 @@
 defmodule Aprs.Types.Mic_e do
+  @moduledoc """
+  mic_e struct
+  """
 
   defstruct lat_degrees: 0,
             lat_minutes: 0,

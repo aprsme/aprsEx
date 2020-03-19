@@ -1,51 +1,12 @@
 defmodule Aprs.Parser do
+  @moduledoc """
+  APRS Parser
+  """
+
   use Bitwise
   alias Aprs.Types.Mic_e
   alias Aprs.Types.Position
 
-  @spec parse(binary()) :: %{
-          base_callsign: nil | binary(),
-          data_extended:
-            nil
-            | <<_::208, _::_ * 32>>
-            | %{
-                optional(:__struct__) => Aprs.Types.Mic_e,
-                optional(:aprs_messaging?) => any(),
-                optional(:comment) => binary(),
-                optional(:data_type) => :position | :position_with_datetime_and_weather,
-                optional(:dti) => <<_::8>>,
-                optional(:heading) => integer(),
-                optional(:lat_degrees) => any(),
-                optional(:lat_direction) => :north | :south | :unknown,
-                optional(:lat_fractional) => any(),
-                optional(:lat_minutes) => any(),
-                optional(:lon_degrees) => number(),
-                optional(:lon_direction) => :east | :unknown | :west,
-                optional(:lon_fractional) => integer(),
-                optional(:lon_minutes) => integer(),
-                optional(:longitude_offset) => 0 | 100,
-                optional(:manufacturer) => :unknown_manufacturer | <<_::40, _::_ * 8>>,
-                optional(:message) => binary(),
-                optional(:message_code) => any(),
-                optional(:message_description) => any(),
-                optional(:message_number) => any(),
-                optional(:message_text) => binary(),
-                optional(:position) => Aprs.Types.Position.t(),
-                optional(:speed) => integer(),
-                optional(:symbol_code) => <<_::8>>,
-                optional(:symbol_table_id) => <<_::8>>,
-                optional(:time) => <<_::56>>,
-                optional(:timestamp) => <<_::56>>,
-                optional(:to) => binary(),
-                optional(:weather) => any()
-              },
-          data_type: atom(),
-          destination: binary(),
-          information_field: binary(),
-          path: binary(),
-          sender: binary(),
-          ssid: nil | binary()
-        }
   def parse(message) do
     [sender, path, data] = String.split(message, [">", ":"], parts: 3)
     [base_callsign, ssid] = parse_callsign(sender)
@@ -67,7 +28,6 @@ defmodule Aprs.Parser do
     }
   end
 
-  @spec parse_callsign(binary()) :: [nil | binary()]
   def parse_callsign(callsign) do
     if String.contains?(callsign, "-") do
       String.split(callsign, "-")
@@ -82,7 +42,6 @@ defmodule Aprs.Parser do
   # first 40 characters of the message. I'm not going to deal with that
   # weird case right now. It seems like its for a specific type of old
   # TNC hardware that probably doesn't even exist anymore.
-  @spec parse_datatype(any()) :: atom()
   def parse_datatype(datatype) when datatype == ":", do: :message
   def parse_datatype(datatype) when datatype == ">", do: :status
   def parse_datatype(datatype) when datatype == "!", do: :position
@@ -102,40 +61,6 @@ defmodule Aprs.Parser do
 
   def parse_datatype(_datatype), do: :unknown_datatype
 
-  @spec parse_data(any(), any(), any()) ::
-          nil
-          | <<_::208, _::_ * 32>>
-          | %{
-              optional(:__struct__) => Aprs.Types.Mic_e,
-              optional(:aprs_messaging?) => any(),
-              optional(:comment) => binary(),
-              optional(:data_type) => :position | :position_with_datetime_and_weather,
-              optional(:dti) => <<_::8>>,
-              optional(:heading) => integer(),
-              optional(:lat_degrees) => any(),
-              optional(:lat_direction) => :north | :south | :unknown,
-              optional(:lat_fractional) => any(),
-              optional(:lat_minutes) => any(),
-              optional(:lon_degrees) => number(),
-              optional(:lon_direction) => :east | :unknown | :west,
-              optional(:lon_fractional) => integer(),
-              optional(:lon_minutes) => integer(),
-              optional(:longitude_offset) => 0 | 100,
-              optional(:manufacturer) => :unknown_manufacturer | <<_::40, _::_ * 8>>,
-              optional(:message) => binary(),
-              optional(:message_code) => any(),
-              optional(:message_description) => any(),
-              optional(:message_number) => any(),
-              optional(:message_text) => binary(),
-              optional(:position) => Aprs.Types.Position.t(),
-              optional(:speed) => integer(),
-              optional(:symbol_code) => <<_::8>>,
-              optional(:symbol_table_id) => <<_::8>>,
-              optional(:time) => <<_::56>>,
-              optional(:timestamp) => <<_::56>>,
-              optional(:to) => binary(),
-              optional(:weather) => any()
-            }
   def parse_data(:mic_e, destination, data), do: parse_mic_e(destination, data)
   def parse_data(:mic_e_old, destination, data), do: parse_mic_e(destination, data)
   def parse_data(:position, _destination, data), do: parse_position_without_timestamp(false, data)
@@ -183,15 +108,6 @@ defmodule Aprs.Parser do
 
   def parse_data(_type, _destination, _data), do: nil
 
-  @spec parse_position_with_datetime_and_weather(any(), <<_::200>>, any()) :: %{
-          aprs_messaging?: any(),
-          data_type: :position_with_datetime_and_weather,
-          position: Aprs.Types.Position.t(),
-          symbol_code: <<_::8>>,
-          symbol_table_id: <<_::8>>,
-          timestamp: <<_::56>>,
-          weather: any()
-        }
   def parse_position_with_datetime_and_weather(
         aprs_messaging?,
         date_time_position_data,
@@ -213,7 +129,6 @@ defmodule Aprs.Parser do
     }
   end
 
-  @spec decode_compressed_position(<<_::64, _::_*8>>) :: [:ok | number(), ...]
   def decode_compressed_position(
         <<"/", latitude::binary-size(4), longitude::binary-size(4), _symbol::binary-size(1),
           _cs::binary-size(2), _compression_type::binary-size(2), _rest::binary>>
@@ -228,16 +143,6 @@ defmodule Aprs.Parser do
     (v1 - 33) * 91 * 91 * 91 + (v2 - 33) * 91 * 91 + (v3 - 33) * 91 + v4
   end
 
-  @spec parse_position_without_timestamp(any(), <<_::16, _::_ * 8>>) ::
-          <<_::208, _::_ * 32>>
-          | %{
-              aprs_messaging?: any(),
-              comment: binary(),
-              data_type: :position,
-              position: Position.t(),
-              symbol_code: <<_::8>>,
-              symbol_table_id: <<_::8>>
-            }
   def parse_position_without_timestamp(_aprs_messaging?, <<"!!", _rest::binary>>) do
     # this is an ultimeter weather station. need to parse its weird format
     "TODO: PARSE ULTIMETER DATA"
@@ -269,15 +174,6 @@ defmodule Aprs.Parser do
     }
   end
 
-  @spec parse_position_with_timestamp(any(), <<_::64, _::_*8>>) :: %{
-          aprs_messaging?: any(),
-          comment: binary(),
-          data_type: :position,
-          position: Position.t(),
-          symbol_code: <<_::8>>,
-          symbol_table_id: <<_::8>>,
-          time: <<_::56>>
-        }
   def parse_position_with_timestamp(
         aprs_messaging?,
         <<_dti::binary-size(1), time::binary-size(7), latitude::binary-size(8),
@@ -297,7 +193,6 @@ defmodule Aprs.Parser do
     }
   end
 
-  @spec parse_mic_e(binary(), <<_::64, _::_*8>>) :: Aprs.Types.Mic_e.t()
   def parse_mic_e(destination_field, information_field) do
     # Mic-E is kind of a nutty compression scheme, APRS packs additional
     # information into the destination field when Mic-E encoding is used.
@@ -330,27 +225,14 @@ defmodule Aprs.Parser do
     }
   end
 
-  @spec parse_mic_e_digit(any()) :: [:custom | nil | :standard | :unknown | integer(), ...]
   def parse_mic_e_digit(<<c>>) when c in ?0..?9, do: [c - ?0, 0, nil]
   def parse_mic_e_digit(<<c>>) when c in ?A..?J, do: [c - ?A, 1, :custom]
   def parse_mic_e_digit(<<c>>) when c in ?P..?Y, do: [c - ?P, 1, :standard]
-
   def parse_mic_e_digit("K"), do: [0, 1, :custom]
   def parse_mic_e_digit("L"), do: [0, 0, nil]
   def parse_mic_e_digit("Z"), do: [0, 1, :standard]
-
   def parse_mic_e_digit(_c), do: [:unknown, :unknown, :unknown]
 
-  @spec parse_mic_e_destination(binary()) :: %{
-          lat_degrees: any(),
-          lat_direction: :north | :south | :unknown,
-          lat_fractional: any(),
-          lat_minutes: any(),
-          lon_direction: :east | :unknown | :west,
-          longitude_offset: :unknown | 0 | 100,
-          message_code: any(),
-          message_description: any()
-        }
   def parse_mic_e_destination(destination_field) do
     digits =
       destination_field
@@ -411,7 +293,7 @@ defmodule Aprs.Parser do
     # Convert the bits to binary to get the array index
     index = message_bit_1 * 4 + message_bit_2 * 2 + message_bit_3
     # need to invert this from the actual array index
-    display_index = String.pad_leading(to_string(7 - index),2, "0")
+    display_index = String.pad_leading(to_string(7 - index), 2, "0")
 
     [message_code, message_description] =
       case message_type do
@@ -437,18 +319,6 @@ defmodule Aprs.Parser do
     }
   end
 
-  @spec parse_mic_e_information(<<_::64, _::_ * 8>>, number()) :: %{
-          dti: <<_::8>>,
-          heading: integer(),
-          lon_degrees: number(),
-          lon_fractional: integer(),
-          lon_minutes: integer(),
-          manufacturer: :unknown_manufacturer | <<_::40, _::_ * 8>>,
-          message: binary(),
-          speed: integer(),
-          symbol: <<_::8>>,
-          table: <<_::8>>
-        }
   def parse_mic_e_information(
         <<dti::binary-size(1), d28::integer, m28::integer, f28::integer, sp28::integer,
           dc28::integer, se28::integer, symbol::binary-size(1), table::binary-size(1),
@@ -505,7 +375,6 @@ defmodule Aprs.Parser do
     }
   end
 
-  @spec parse_manufacturer(any(), any(), any()) :: :unknown_manufacturer | <<_::40, _::_*8>>
   def parse_manufacturer(" ", _s2, _s3), do: "Original MIC-E"
   def parse_manufacturer(">", _s2, "="), do: "Kenwood TH-D72"
   def parse_manufacturer(">", _s2, "^"), do: "Kenwood TH-D74"

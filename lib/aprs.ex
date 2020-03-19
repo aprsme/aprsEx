@@ -1,4 +1,8 @@
 defmodule Aprs do
+  @moduledoc """
+  Main application
+  """
+
   use GenServer
   require Logger
   alias Aprs.Parser
@@ -6,26 +10,10 @@ defmodule Aprs do
   @aprs_timeout 30 * 1000
 
   # Initialization
-
-  @spec start_link() :: :ignore | {:error, any()} | {:ok, pid()}
   def start_link do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
 
-  @spec init(any()) ::
-          {:ok,
-           %{
-             port: char(),
-             server:
-               atom()
-               | charlist()
-               | {:local, binary() | [any()]}
-               | {byte(), byte(), byte(), byte()}
-               | {char(), char(), char(), char(), char(), char(), char(), char()},
-             socket: port(),
-             timer: any()
-           }}
-          | {:stop, :aprs_connection_failed}
   def init(_args) do
     # Trap exits so we can gracefully shut down
     Process.flag(:trap_exit, true)
@@ -33,7 +21,7 @@ defmodule Aprs do
     # Get startup parameters
     server = Application.get_env(:aprs, :server, 'rotate.aprs2.net')
     port = Application.get_env(:aprs, :port, 14_580)
-    default_filter = Application.get_env(:aprs, :default_filter, "r/47.6/-122.3/100")
+    default_filter = Application.get_env(:aprs, :default_filter, "r/33.174250/-96.498806/100")
     aprs_user_id = Application.get_env(:aprs, :login_id, "CHANGE_ME")
     aprs_passcode = Application.get_env(:aprs, :password, "-1")
 
@@ -77,24 +65,20 @@ defmodule Aprs do
 
   # Client API
 
-  @spec stop() :: :ok
   def stop do
     Logger.info("Stopping Server")
     GenServer.stop(__MODULE__, :stop)
   end
 
-  @spec set_filter(any()) :: any()
   def set_filter(filter_string), do: send_message("#filter #{filter_string}")
-  @spec list_active_filters() :: any()
+
   def list_active_filters, do: send_message("#filter?")
 
-  @spec send_message(any(), binary(), any()) :: any()
   def send_message(from, to, message) do
     padded_callsign = String.pad_trailing(to, 9)
     send_message("#{from}>APRS,TCPIP*::#{padded_callsign}:#{message}")
   end
 
-  @spec send_message(any()) :: any()
   def send_message(message) do
     GenServer.call(__MODULE__, {:send_message, message})
   end
@@ -172,13 +156,12 @@ defmodule Aprs do
     :normal
   end
 
-  @spec dispatch(binary()) :: :ok | {:error, any()}
   def dispatch("#" <> comment_text) do
     Logger.debug("COMMENT:" <> String.trim(comment_text))
   end
 
   def dispatch(message) do
-    Logger.debug("MESSAGE:" <> message)
+    # Logger.debug("MESSAGE:" <> message)
     parsed_message = Parser.parse(message)
 
     time_message_received =
@@ -214,7 +197,6 @@ defmodule Aprs do
     Logger.debug("SERVER:" <> message)
   end
 
-  @spec process(any(), any()) :: nil | true
   def process(message, message_type) when message_type == :message do
     time_message_received =
       :calendar.universal_time() |> :calendar.datetime_to_gregorian_seconds()
@@ -227,7 +209,6 @@ defmodule Aprs do
 
   def process(_, _), do: nil
 
-  @spec recent_messages_for(any(), any()) :: non_neg_integer()
   def recent_messages_for(callsign, since_time) do
     callsign_guard = {:==, :"$1", {:const, callsign}}
     timestamp_guard = {:>=, :"$2", {:const, since_time}}

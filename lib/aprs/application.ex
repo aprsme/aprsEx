@@ -1,4 +1,8 @@
 defmodule Aprs.Application do
+  @moduledoc """
+  Main application
+  """
+
   use Application
 
   def start(_, _) do
